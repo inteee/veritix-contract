@@ -261,6 +261,91 @@ pub fn refund(e: &Env, caller: &Address, id: u32) {
     .publish(e);
 }
 
+/// Emitted when the admin settles an escrow by hand.
+#[soroban_sdk::contractevent(data_format = "vec")]
+#[derive(Clone, Debug, Eq, PartialEq)]
+pub struct EscrowAdminSettled {
+    #[topic]
+    pub admin: Address,
+    #[topic]
+    pub winner: Address,
+    pub id: u32,
+    pub amount: i128,
+}
+
+/// Releases an escrow to its beneficiary once its deadline ledger has passed.
+///
+/// Callable by anyone. Refuses while a dispute is open.
+///
+/// # Panics
+///
+/// Panics with `EscrowNotExpired` when the current ledger is not past the
+/// deadline, and with `EscrowNotActive` or `EscrowDisputed` as for [`release`].
+pub fn auto_release(e: &Env, id: u32) {
+    require_no_open_dispute(e, id);
+    let mut record = record(e, id);
+    require_active(id, &record);
+    if e.ledger().sequence() <= record.deadline_ledger {
+        panic!(
+            "EscrowNotExpired: escrow {} deadline ledger {} has not passed",
+            id, record.deadline_ledger
+        );
+    }
+
+    let amount = record.amount;
+    pay(e, &record.token, &record.beneficiary, amount);
+    decrease_value_locked(e, amount);
+    record.status = EscrowStatus::Released;
+    record.amount = 0;
+    store_record(e, id, &record);
+
+    EscrowReleased {
+        beneficiary: record.beneficiary.clone(),
+        id,
+        amount,
+        remaining: 0,
+    }
+    .publish(e);
+}
+
+/// Lets the admin settle an unsettled escrow, even one stuck behind an
+/// abandoned dispute, by paying the remaining amount to `winner`.
+///
+/// # Panics
+///
+/// Panics when `admin` is not the admin, with `EscrowNotActive` when the escrow
+/// is already settled, and with `WinnerNotEscrowParty` when `winner` is neither
+/// the depositor nor the beneficiary.
+pub fn admin_settle(e: &Env, admin: &Address, id: u32, winner: &Address) {
+    crate::admin::check_admin(e, admin);
+    let mut record = record(e, id);
+    if is_settled_status(&record.status) {
+        panic!("EscrowNotActive: escrow {} is already {:?}", id, record.status);
+    }
+    if winner != &record.depositor && winner != &record.beneficiary {
+        panic!("WinnerNotEscrowParty: winner must be the depositor or the beneficiary");
+    }
+
+    let amount = record.amount;
+    pay(e, &record.token, winner, amount);
+    decrease_value_locked(e, amount);
+    record.status = if winner == &record.beneficiary {
+        EscrowStatus::Released
+    } else {
+        EscrowStatus::Refunded
+    };
+    record.amount = 0;
+    store_record(e, id, &record);
+
+    EscrowAdminSettled {
+        admin: admin.clone(),
+        winner: winner.clone(),
+        id,
+        amount,
+    }
+    .publish(e);
+}
+
 /// Pays `amount` of the held funds to the beneficiary without closing the
 /// escrow, unless it was the last of the money.
 ///

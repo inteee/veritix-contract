@@ -31,7 +31,74 @@ fn store_new(e: &Env, record: &EscrowRecord) -> u32 {
     e.storage()
         .persistent()
         .set(&DataKey::EscrowCount, &next_id);
+    index_push(e, DataKey::DepositorEscrows(record.depositor.clone()), id);
+    index_push(e, DataKey::BeneficiaryEscrows(record.beneficiary.clone()), id);
     id
+}
+
+/// Largest page returned by [`ids_page`].
+pub const MAX_PAGE: u32 = 50;
+
+fn index_ids(e: &Env, key: &DataKey) -> soroban_sdk::Vec<u32> {
+    e.storage()
+        .persistent()
+        .get(key)
+        .unwrap_or_else(|| soroban_sdk::Vec::new(e))
+}
+
+fn index_push(e: &Env, key: DataKey, id: u32) {
+    let mut ids = index_ids(e, &key);
+    ids.push_back(id);
+    e.storage().persistent().set(&key, &ids);
+}
+
+fn index_remove(e: &Env, key: DataKey, id: u32) {
+    let mut ids = index_ids(e, &key);
+    if let Some(pos) = ids.first_index_of(id) {
+        ids.remove(pos);
+    }
+    e.storage().persistent().set(&key, &ids);
+}
+
+/// A page of the escrow ids indexed under `key`, starting at `start` and
+/// holding at most `limit` (capped at [`MAX_PAGE`]) ids.
+pub fn ids_page(e: &Env, key: &DataKey, start: u32, limit: u32) -> soroban_sdk::Vec<u32> {
+    let all = index_ids(e, key);
+    let limit = if limit > MAX_PAGE { MAX_PAGE } else { limit };
+    let end = core::cmp::min(start.saturating_add(limit), all.len());
+    let mut out = soroban_sdk::Vec::new(e);
+    let mut i = start;
+    while i < end {
+        if let Some(id) = all.get(i) {
+            out.push_back(id);
+        }
+        i += 1;
+    }
+    out
+}
+
+/// Total token amount still held across all active escrows.
+pub fn escrowed_total(e: &Env) -> i128 {
+    value_locked(e)
+}
+
+/// `(total locked, active count, settled count)` over every escrow created.
+///
+/// Walks every escrow, so its cost grows with the number of escrows.
+pub fn stats(e: &Env) -> (i128, u32, u32) {
+    let mut active = 0u32;
+    let mut settled = 0u32;
+    let mut id = 0u32;
+    let n = count(e);
+    while id < n {
+        if is_settled_status(&record(e, id).status) {
+            settled += 1;
+        } else {
+            active += 1;
+        }
+        id += 1;
+    }
+    (value_locked(e), active, settled)
 }
 
 /// Overwrites the record stored at `id`.
@@ -307,4 +374,26 @@ pub fn release_partial(e: &Env, caller: &Address, id: u32, amount: i128) {
         remaining,
     }
     .publish(e);
+}
+
+/// Reassigns an unsettled escrow to `new_beneficiary` and keeps the beneficiary
+/// index in sync.
+///
+/// # Panics
+///
+/// Panics with `Unauthorized` unless `depositor` is the escrow's depositor, and
+/// with `EscrowNotActive` / `EscrowDisputed` as for [`release`].
+pub fn transfer_beneficiary(e: &Env, depositor: &Address, id: u32, new_beneficiary: &Address) {
+    require_no_open_dispute(e, id);
+    let mut record = record(e, id);
+    require_active(id, &record);
+    if &record.depositor != depositor {
+        panic!("Unauthorized: only the depositor may change the beneficiary of escrow {}", id);
+    }
+    depositor.require_auth();
+
+    index_remove(e, DataKey::BeneficiaryEscrows(record.beneficiary.clone()), id);
+    index_push(e, DataKey::BeneficiaryEscrows(new_beneficiary.clone()), id);
+    record.beneficiary = new_beneficiary.clone();
+    store_record(e, id, &record);
 }

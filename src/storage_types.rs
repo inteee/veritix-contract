@@ -59,6 +59,10 @@ pub enum DataKey {
     EscrowCount,
     /// Total token amount still held across all active escrows.
     EscrowValueLocked,
+    /// Escrow ids created by a depositor, in creation order.
+    DepositorEscrows(Address),
+    /// Escrow ids owed to a beneficiary, in creation order.
+    BeneficiaryEscrows(Address),
 /// A payment split held under its id.
     Split(u64),
     /// The retained execution history for a recurring schedule.

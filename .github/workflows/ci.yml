@@ -52,9 +52,9 @@ jobs:
       # target it actually ships as, and the tests are linted on the host where
       # `extern crate std` is in effect.
       - name: Lint the contract for the wasm target
-        run: cargo clippy --lib --target wasm32v1-none -- -D warnings
+        run: cargo clippy --locked --lib --target wasm32v1-none -- -D warnings
       - name: Lint the test targets
-        run: cargo clippy --tests --all-features -- -D warnings
+        run: cargo clippy --locked --tests --all-features -- -D warnings
 
   test:
     name: Test
@@ -64,7 +64,7 @@ jobs:
       - name: Show toolchain
         run: rustup show
       - name: cargo test
-        run: cargo test --all-features
+        run: cargo test --locked --all-features
 
   wasm:
     name: Build wasm
@@ -76,7 +76,7 @@ jobs:
       - name: Add wasm target
         run: rustup target add wasm32v1-none
       - name: Build release wasm
-        run: cargo build --release --target wasm32v1-none
+        run: cargo build --locked --release --target wasm32v1-none
       - name: Check artifact size against the Soroban limit
         run: |
           set -euo pipefail

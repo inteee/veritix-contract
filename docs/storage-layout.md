@@ -21,35 +21,43 @@ the number of users belongs in persistent storage.
 
 ## Key reference
 
-| `DataKey` variant             | Value type    | Durability | Owning module | Notes                                                                               |
-| ----------------------------- | ------------- | ---------- | ------------- | ----------------------------------------------------------------------------------- |
-| `Admin`                       | `Address`     | Instance   | `admin`       | Set once at initialization. Panics on re-initialization.                            |
-| `PendingAdmin`                | `Address`     | Instance   | `admin`       | Nominee during a two-step ownership transfer. Absent when no transfer is in flight. |
-| `AdminActiveAfterLedger`      | `u32`         | Instance   | `admin`       | Ledger from which `PendingAdmin` becomes `Admin`.                                   |
-| `ClawbackCosigner`            | `Address`     | Instance   | `admin`       | Second signer a clawback requires alongside the admin.                              |
-| `TotalSupply`                 | `i128`        | Instance   | `balance`     | Tokens in circulation, net of burns.                                                |
-| `MaxSupply`                   | `i128`        | Instance   | `balance`     | Hard cap fixed at initialization. Absent when the token is uncapped.                |
-| `Balance(Address)`            | `i128`        | Persistent | `balance`     | Token balance of one account.                                                       |
-| `Allowance(Address, Address)` | `(i128, u32)` | Persistent | `allowance`   | Amount approved by the first address for the second, and the ledger it expires at.  |
-| `Counter(Address)`            | `u32`         | Persistent | `counter`     | Monotonic per-address counter.                                                      |
+Every `DataKey` variant currently defined in `src/storage_types.rs`. All keys are stored in persistent storage.
 
-Record types that are stored under keys added by later issues:
-
-| Record                      | Key                     | Value type                | Durability | Owning module |
-| --------------------------- | ----------------------- | ------------------------- | ---------- | ------------- |
-| `EscrowRecord`              | `Escrow(u64)`           | `EscrowRecord`            | Persistent | `escrow`      |
-| `SplitRecord`               | `Split(u64)`            | `SplitRecord`             | Persistent | `splitter`    |
-| `RecurringPayment`          | `Recurring(u64)`        | `RecurringPayment`        | Persistent | `recurring`   |
-| Recurring execution history | `RecurringHistory(u64)` | `Vec<RecurringExecution>` | Persistent | `recurring`   |
-| `DisputeRecord`             | `Dispute(u64)`          | `DisputeRecord`           | Persistent | `dispute`     |
-
-Recurring execution history retains at most 100 charges per schedule. When a
-new successful charge is recorded at capacity, the oldest entry is discarded.
-
-The `Escrow`, `Split`, `Recurring`, and `Dispute` key variants are added by the
-issues that introduce those modules. They are listed here so the intended
-durability is agreed in advance: all four are per-record, unbounded in count,
-and therefore persistent.
+| `DataKey` variant | Description | Durability |
+| --- | --- | --- |
+| `Admin` | Address holding admin authority. | Persistent |
+| `PendingAdmin` | The administrator nominated by a two-step ownership transfer, if any. | Persistent |
+| `AdminActiveAfterLedger` | The ledger from which `PendingAdmin` becomes the active `Admin`. | Persistent |
+| `ClawbackCosigner` | The second signer required alongside the admin for a clawback. | Persistent |
+| `InitializedAtLedger` | The ledger at which the contract was initialized. | Persistent |
+| `Balance(Address)` | Token balance of a single account. | Persistent |
+| `BalanceOf(Address)` | Token balance key used by the balance module. | Persistent |
+| `Allowance(Address, Address)` | Spending allowance granted by `owner` to `spender`. | Persistent |
+| `AllowanceSpenders(Address)` | The spenders an owner currently has an allowance with, in grant order. | Persistent |
+| `EscrowLocked(Address)` | The portion of an account's balance held by an active escrow. | Persistent |
+| `Paused` | Whether the whole contract is paused. | Persistent |
+| `WhitelistEnabled` | Whether token holders must be whitelisted. | Persistent |
+| `Frozen(Address)` | Whether an account is frozen and cannot move tokens. | Persistent |
+| `Authorized(Address)` | Whether an account is authorized to move tokens. Absent means authorized. | Persistent |
+| `TotalSupply` | Total tokens in circulation. | Persistent |
+| `MaxSupply` | Hard supply cap. Unset or 0 means supply is uncapped. | Persistent |
+| `Name` | The token name. | Persistent |
+| `Symbol` | The token symbol. | Persistent |
+| `Decimals` | The number of decimals the token uses. | Persistent |
+| `Escrow(u64)` | An escrow held under its id, for lifecycle and settlement tracking. | Persistent |
+| `EscrowCount` | Number of escrows created so far (also the next escrow id). | Persistent |
+| `EscrowValueLocked` | Total token amount still held across all active escrows. | Persistent |
+| `Split(u64)` | A payment split held under its id. | Persistent |
+| `RecurringHistory(u64)` | The retained execution history for a recurring schedule. | Persistent |
+| `PayerRecurrings(Address)` | Recurring schedule ids indexed by payer. | Persistent |
+| `PayeeRecurrings(Address)` | Recurring schedule ids indexed by payee. | Persistent |
+| `Dispute(u64)` | The dispute record open over an escrow, keyed by escrow id. | Persistent |
+| `Recurring(u64)` | An authorised recurring payment, keyed by recurring payment id. | Persistent |
+| `RecurringCount` | Number of recurring schedules created so far (also the next id). | Persistent |
+| `Arbiter` | The globally configured dispute arbiter (resolver). | Persistent |
+| `MultiEscrow(u64)` | A multi-beneficiary escrow held under its id. | Persistent |
+| `MultiEscrowCount` | Number of multi-escrows created so far (also the next id). | Persistent |
+| `Counter(Address)` | A monotonically increasing per-address counter. | Persistent |
 
 ## TTL policy
 

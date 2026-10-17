@@ -1,0 +1,6 @@
+#!/usr/bin/env sh
+set -e
+
+cargo fmt --all --check
+cargo clippy --lib --target wasm32v1-none -- -D warnings
+cargo clippy --tests --all-features -- -D warnings

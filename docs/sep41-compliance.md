@@ -9,28 +9,25 @@ test rather than failing silently in a wallet.
 
 ## Interface
 
+The functions currently exposed by `VeriTixPay` (see `src/contract.rs`):
+
 | Function | Signature | Notes |
 | --- | --- | --- |
 | `name` | `() -> String` | Defaults to `VeriTix`; overridable with `initialize_with_metadata`. |
 | `symbol` | `() -> String` | Defaults to `VTX`. |
 | `decimals` | `() -> u32` | Defaults to `7`. |
 | `total_supply` | `() -> i128` | `0` before the first mint. |
+| `max_supply` | `() -> i128` | Supply cap, `0` when uncapped. |
 | `balance` | `(account: Address) -> i128` | `0` for an address that has never been credited. |
-| `spendable_balance` | `(account: Address) -> i128` | The balance minus escrow locks; `0` while frozen. |
-| `allowance` | `(from: Address, spender: Address) -> i128` | Reads `0` once the allowance has expired. |
-| `approve` | `(from, spender, amount: i128, expiration_ledger: u32)` | Overwrites. Emits `approve`. |
-| `transfer` | `(from, to, amount: i128)` | Emits `transfer`. |
-| `transfer_from` | `(spender, from, to, amount: i128)` | Consumes an allowance. Emits `transfer`. |
-| `transfer_with_memo` | `(from, to, amount: i128, memo: Bytes)` | Emits `transfer` with the memo appended to the data. |
-| `burn` | `(from, amount: i128)` | Emits `burn`. |
-| `burn_from` | `(spender, from, amount: i128)` | Consumes an allowance. Emits `burn`. |
-| `clawback` | `(admin, from, amount: i128)` | Admin-only. Emits `clawback`. |
+| `transfer` | `(from, to, amount: i128)` | Requires `from` authorization. |
+| `mint` | `(admin, to, amount: i128)` | Admin-only. |
 
-Beyond the standard, the contract also exposes `total_holders`, `get_holders`,
-`max_supply`, `allowance_expiration`, `escrow_locked`, `spendable_balance`,
-`is_paused`, `is_frozen`, `set_frozen`, `set_paused`, `mint`, `admin`,
-`is_initialized`, and `initialized_at_ledger`. None of these replace a required
-function; they exist for operators.
+The allowance, burn, clawback, memo and holder-set logic exists as internal
+modules (`src/allowance.rs`, `src/events.rs`) but is **not yet exposed** as
+contract entry points, so the contract is not yet fully SEP-41 compliant.
+`approve`, `allowance`, `transfer_from`, `burn` and `burn_from` still need to
+be exposed. Extra operator functions such as `total_holders`, `get_holders`,
+`spendable_balance`, `is_paused` and `set_frozen` are likewise not available.
 
 ## Allowance expiration
 

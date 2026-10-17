@@ -212,6 +212,18 @@ impl VeriTixPay {
         escrow::is_settled(&e, escrow_id)
     }
 
+    /// Releases `escrow_id` to its beneficiary once its deadline has passed.
+    /// Callable by anyone; refused while a dispute is open.
+    pub fn trigger_auto_release(e: Env, escrow_id: u32) {
+        escrow::auto_release(&e, escrow_id);
+    }
+
+    /// Admin escape hatch: pays the remainder of `escrow_id` to `winner`, which
+    /// must be the depositor or the beneficiary.
+    pub fn admin_settle_escrow(e: Env, admin: Address, escrow_id: u32, winner: Address) {
+        escrow::admin_settle(&e, &admin, escrow_id, &winner);
+    }
+
     /// Raises a dispute over `escrow_id`, freezing it until a ruling is final.
     pub fn raise_dispute(e: Env, claimant: Address, escrow_id: u64, resolver: Option<Address>) {
         crate::dispute::raise_dispute(&e, &claimant, escrow_id, resolver);

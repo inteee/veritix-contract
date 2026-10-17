@@ -161,6 +161,37 @@ impl VeriTixPay {
         escrow::release_partial(&e, &caller, escrow_id, amount);
     }
 
+    /// A page of escrow ids created by `depositor` (at most 50 per call).
+    pub fn get_escrows_by_depositor(e: Env, depositor: Address, start: u32, limit: u32) -> Vec<u32> {
+        escrow::ids_page(&e, &DataKey::DepositorEscrows(depositor), start, limit)
+    }
+
+    /// A page of escrow ids owed to `beneficiary` (at most 50 per call).
+    pub fn get_escrows_by_beneficiary(e: Env, beneficiary: Address, start: u32, limit: u32) -> Vec<u32> {
+        escrow::ids_page(&e, &DataKey::BeneficiaryEscrows(beneficiary), start, limit)
+    }
+
+    /// Total token amount still held across all active escrows.
+    pub fn escrowed_total(e: Env) -> i128 {
+        escrow::escrowed_total(&e)
+    }
+
+    /// `(total locked, active count, settled count)` across all escrows.
+    pub fn escrow_stats(e: Env) -> (i128, u32, u32) {
+        escrow::stats(&e)
+    }
+
+    /// Reassigns an unsettled escrow to a new beneficiary. Depositor only.
+    pub fn transfer_escrow_beneficiary(e: Env, depositor: Address, escrow_id: u32, new_beneficiary: Address) {
+        escrow::transfer_beneficiary(&e, &depositor, escrow_id, &new_beneficiary);
+    }
+
+    /// Creates one escrow per recipient of split `split_id` for its share and
+    /// returns the new escrow ids.
+    pub fn split_to_escrow(e: Env, sender: Address, split_id: u64, deadline_ledger: u32) -> Vec<u32> {
+        crate::splitter::split_to_escrow(&e, &sender, split_id, deadline_ledger)
+    }
+
     /// The full record for `escrow_id`.
     ///
     /// # Panics

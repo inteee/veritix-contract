@@ -151,6 +151,42 @@ pub fn record(e: &Env, id: u32) -> EscrowRecord {
         .unwrap_or_else(|| panic!("EscrowNotFound: no escrow with id {}", id))
 }
 
+/// Maximum number of ids accepted by [`records_batch`].
+pub const MAX_BATCH: u32 = 50;
+
+/// Ledgers elapsed since escrow `id` was created.
+///
+/// # Panics
+///
+/// Panics with `EscrowNotFound` when no escrow exists at `id`.
+pub fn age(e: &Env, id: u32) -> u32 {
+    e.ledger().sequence().saturating_sub(record(e, id).created_ledger)
+}
+
+/// Reads many escrows at once, preserving order and returning `None` for ids
+/// that do not exist.
+///
+/// # Panics
+///
+/// Panics with `EscrowBatchTooLarge` when more than [`MAX_BATCH`] ids are given.
+pub fn records_batch(
+    e: &Env,
+    ids: &soroban_sdk::Vec<u32>,
+) -> soroban_sdk::Vec<Option<EscrowRecord>> {
+    if ids.len() > MAX_BATCH {
+        panic!(
+            "EscrowBatchTooLarge: {} ids requested, at most {} allowed",
+            ids.len(),
+            MAX_BATCH
+        );
+    }
+    let mut out = soroban_sdk::Vec::new(e);
+    for id in ids.iter() {
+        out.push_back(e.storage().persistent().get(&DataKey::EscrowRecord(id)));
+    }
+    out
+}
+
 /// Whether `status` is terminal.
 pub fn is_settled_status(status: &EscrowStatus) -> bool {
     matches!(status, EscrowStatus::Released | EscrowStatus::Refunded)

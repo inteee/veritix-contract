@@ -202,6 +202,16 @@ impl VeriTixPay {
         escrow::record(&e, escrow_id)
     }
 
+    /// Ledgers elapsed since `escrow_id` was created.
+    pub fn get_escrow_age(e: Env, escrow_id: u32) -> u32 {
+        escrow::age(&e, escrow_id)
+    }
+
+    /// Reads up to 50 escrows in one call, in order, with `None` for missing ids.
+    pub fn get_escrows_batch(e: Env, ids: Vec<u32>) -> Vec<Option<EscrowRecord>> {
+        escrow::records_batch(&e, &ids)
+    }
+
     /// Whether `escrow_id` has been settled — released or refunded.
     ///
     /// # Panics
